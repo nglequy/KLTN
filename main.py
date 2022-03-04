@@ -1,24 +1,57 @@
 import time
+import PIL.ImageTk
 import cv2
+from tkinter import *
 import numpy as np
 import pyttsx3
 from cvzone.HandTrackingModule import HandDetector
 from cvzone.SelfiSegmentationModule import SelfiSegmentation
 from keras.models import load_model
+import tkinter
+from PIL import Image
+
+window = tkinter.Tk()
+window.title("ASL")
 
 cam = cv2.VideoCapture(0)
-cam.set(3, 1280)
-cam.set(4, 720)
+
+canvas_w = cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+canvas_h = cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
+canvas = tkinter.Canvas(window, width=canvas_w + 400, height=canvas_h, bg="sky blue")
+canvas.pack()
 
 text = str("")
 character = str("")
 count = 0
 
+bg_model = None
 resetBackground = 0
 segmentor = SelfiSegmentation()
 detector = HandDetector(detectionCon=0.8, maxHands=2)
 
 model = load_model('models/weightsFeb28031.00.hdf5')
+
+
+def button_quit():
+    window.quit()
+
+
+def button_reset():
+    global bg_model, resetBackground
+    bg_model = None
+    resetBackground = 0
+    print('Background reset')
+    time.sleep(1)
+    print("Done")
+
+
+button1 = tkinter.Button(window, text="Quit", command=button_quit)
+button1.pack(side=LEFT)
+button2 = tkinter.Button(window, text="Reset background", command=button_reset)
+button2.pack(side=LEFT)
+
+photo = None
+photo2 = None
 
 class_names = ['1', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
                'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'enter', ' ']
@@ -53,7 +86,8 @@ def predict_image(image):
 
 
 def remove_background(img):
-    mask = bgModel.apply(img, learningRate=0)
+    global bg_model
+    mask = bg_model.apply(img, learningRate=0)
     kernel = np.ones((3, 3), np.uint8)
     mask = cv2.erode(mask, kernel, iterations=1)
     mask = cv2.dilate(mask, kernel, iterations=1)
@@ -63,24 +97,27 @@ def remove_background(img):
 
 
 def hand_process(img_hand):
+    global photo2
     img_hand = cv2.resize(img_hand, dsize=(400, 400))
     img_hand = cv2.cvtColor(img_hand, cv2.COLOR_BGR2GRAY)
     img_hand = cv2.GaussianBlur(img_hand, (7, 7), 0)
     thresh, img_hand = cv2.threshold(img_hand, 25, 255, cv2.THRESH_BINARY_INV)
-    cv2.imshow("Hands", img_hand)
+    # cv2.imshow("Hands", img_hand)
+    photo2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(img_hand))
+    canvas.create_image(640, 0, image=photo2, anchor=tkinter.NW)
     character = predict_image(img_hand)
     return character
 
 
-while cam.isOpened():
+def update_cam():
+    global photo, canvas, character, resetBackground, count, text, bg_model
     success, img = cam.read()
     img = cv2.bilateralFilter(img, 5, 50, 100)
     img = cv2.GaussianBlur(img, (9, 9), 0)
     hands = detector.findHands(img, draw=False)
 
     if resetBackground == 0:
-        success_bG, background = cam.read()
-        bgModel = cv2.createBackgroundSubtractorMOG2(0, 50)
+        bg_model = cv2.createBackgroundSubtractorMOG2(0, 50)
         resetBackground = 1
     img_hand = remove_background(img)
 
@@ -93,31 +130,34 @@ while cam.isOpened():
                           (0, 255, 255), 2)
             if (10 < x) & (0 < y + h / 2 - w / 2 - 10):
                 img_hand = img_hand[int(y + h / 2 - w / 2 - 10):int(y + h / 2 + w / 2 + 10), x - 10:x + w + 10]
-                character = hand_process(img_hand)
         else:
             cv2.rectangle(img, (int(x + w / 2 - h / 2 - 10), y - 10), (int(x + w / 2 + h / 2 + 10), y + h + 10),
                           (0, 255, 255), 2)
             if (0 < x + w / 2 - h / 2 - 10) & (10 < y):
                 img_hand = img_hand[y - 10:y + h + 10, int(x + w / 2 - h / 2 - 10):int(x + w / 2 + h / 2 + 10)]
-                character = hand_process(img_hand)
+
+        character = hand_process(img_hand)
+
         if character == old_character:
             count += 1
             if count > 5:
                 count = 0
                 text = character_pairing(character, text)
-                print(text)
+                display = text + "|"
+                print(display)
+                canvas.delete("del")
+                canvas.create_text(640, 400, text=display, anchor=tkinter.NW, tags="del")
 
-    cv2.imshow("Image", img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(img))
+    canvas.create_image(0, 0, image=photo, anchor=tkinter.NW)
+    # k = cv2.waitKey(10)
+    # if k == ord('q'):  # Quit
+    #     button_quit()
+    # elif k == ord('r'):  # Reset background
+    #     button_reset()
+    window.after(15, update_cam)
 
-    k = cv2.waitKey(10)
-    if k == ord('q'):  # Quit
-        break
-    elif k == ord('r'):  # Reset background
-        bgModel = None
-        resetBackground = 0
-        print('Background reset')
-        time.sleep(1)
-        print("Done")
 
-cv2.destroyAllWindows()
-cam.release()
+update_cam()
+window.mainloop()
