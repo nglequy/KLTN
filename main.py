@@ -1,13 +1,13 @@
 import time
 import PIL.ImageTk
 import cv2
-from tkinter import *
 import numpy as np
 import pyttsx3
+import tkinter
+from tkinter import *
 from cvzone.HandTrackingModule import HandDetector
 from cvzone.SelfiSegmentationModule import SelfiSegmentation
 from keras.models import load_model
-import tkinter
 from PIL import Image
 
 window = tkinter.Tk()
@@ -40,9 +40,7 @@ def button_reset():
     global bg_model, resetBackground
     bg_model = None
     resetBackground = 0
-    print('Background reset')
     time.sleep(1)
-    print("Done")
 
 
 button1 = tkinter.Button(window, text="Quit", command=button_quit)
@@ -53,8 +51,8 @@ button2.pack(side=LEFT)
 photo = None
 photo2 = None
 
-class_names = ['1', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-               'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'enter', ' ']
+class_names = ['1', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+               'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'del', 'enter', ' ']
 
 
 def character_pairing(character, text):
@@ -104,7 +102,7 @@ def hand_process(img_hand):
     thresh, img_hand = cv2.threshold(img_hand, 25, 255, cv2.THRESH_BINARY_INV)
     # cv2.imshow("Hands", img_hand)
     photo2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(img_hand))
-    canvas.create_image(640, 0, image=photo2, anchor=tkinter.NW)
+    canvas.create_image(canvas_w, 0, image=photo2, anchor=tkinter.NW)
     character = predict_image(img_hand)
     return character
 
@@ -146,7 +144,7 @@ def update_cam():
                 display = text + "|"
                 print(display)
                 canvas.delete("del")
-                canvas.create_text(640, 400, text=display, anchor=tkinter.NW, tags="del")
+                canvas.create_text(canvas_w, 400, text=display, anchor=tkinter.NW, tags="del")
 
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     photo = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(img))
